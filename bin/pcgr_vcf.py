@@ -4,6 +4,7 @@ import os
 import re
 import pandas as pd
 from pysam import VariantFile
+import argparse
 
 # same as before, just make two similar functions for tumor-normal, tumor-only.
 
@@ -324,7 +325,17 @@ def pcgr_ready_vcf(sample):
         else:
             tumor_only(sample)
 
-if __name__ == "__main__":
-    from xcmds import xcmds
+def main():
+    # Argument parsing using argparse
+    parser = argparse.ArgumentParser(description="Reformat somatic CNA files for PCGR input.")
+    parser.add_argument("-s", "--sample", required=True, help="Sample name (meta.id) for the output.")
 
-    xcmds.xcmds(locals())
+    args = parser.parse_args()
+
+
+    # Call reformat_cna function with arguments
+    pcgr_ready_vcf(args.sample)
+
+
+if __name__ == "__main__":
+    main()

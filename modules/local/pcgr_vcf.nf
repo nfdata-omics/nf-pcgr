@@ -22,8 +22,7 @@ process PCGR_VCF {
     prefix = task.ext.prefix ?: "${meta.id}"
     """
     pcgr_vcf.py \\
-        pcgr_ready_vcf \\
-        -sample ${prefix}
+        --sample ${prefix}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

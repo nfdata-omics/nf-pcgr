@@ -4,6 +4,7 @@ import os
 import glob
 import re
 import pandas as pd
+import argparse
 
 
 def intersect_variants(sample):
@@ -74,7 +75,17 @@ def intersect_variants(sample):
         )
 
 
-if __name__ == "__main__":
-    from xcmds import xcmds
+def main():
+    # Argument parsing using argparse
+    parser = argparse.ArgumentParser(description="Reformat somatic CNA files for PCGR input.")
+    parser.add_argument("-s", "--sample", required=True, help="Sample name (meta.id) for the output.")
 
-    xcmds.xcmds(locals())
+    args = parser.parse_args()
+
+
+    # Call reformat_cna function with arguments
+    intersect_variants(args.sample)
+
+
+if __name__ == "__main__":
+    main()

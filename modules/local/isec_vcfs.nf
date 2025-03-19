@@ -21,7 +21,7 @@ process ISEC_SOMATIC_VCFS {
     prefix = task.ext.prefix ?: "${meta.id}" // meta.sample, toggle using modules.config
     """
     isec_vcfs.py \
-        -sample ${prefix}
+        --sample ${prefix}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
