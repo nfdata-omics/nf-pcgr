@@ -2,15 +2,16 @@ process PCGR {
     tag "${meta.patient}:${meta.sample}"
     label 'process_high'
 
-    conda "pcgr::pcgr=1.2.0"
+    conda "pcgr::pcgr=2.1.2"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker.io/sigven/pcgr:1.2.0':
-        'docker.io/sigven/pcgr:1.2.0' }"
+        'docker.io/sigven/pcgr:2.1.2':
+        'docker.io/sigven/pcgr:2.1.2' }"
 
     input:
     tuple val(meta), path(vcf), path(tbi), path(cna)
     path(pcgr_dir), stageAs: "PCGR/data/${params.genome.toLowerCase()}"
     path pon
+    path vep_cache 
 
     output:
     tuple val(meta), path("${prefix}"), emit: pcgr_reports
@@ -30,7 +31,8 @@ process PCGR {
 
     pcgr \\
         --input_vcf $vcf \\
-        --pcgr_dir $database \\
+        --vep_dir $vep_cache \\
+        --refdata_dir $database \\
         --output_dir $prefix \\
         --genome_assembly $genome \\
         --sample_id $prefix \\

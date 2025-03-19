@@ -2,10 +2,10 @@ process CPSR {
     tag "${meta.patient}.${meta.sample}"
     label 'process_medium'
 
-    conda "pcgr::pcgr=1.2.0"
+    conda "pcgr::pcgr=2.1.2"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker.io/sigven/pcgr:1.2.0':
-        'docker.io/sigven/pcgr:1.2.0' }"
+        'docker.io/sigven/pcgr:2.1.2':
+        'docker.io/sigven/pcgr:2.1.2' }"
 
     input:
     tuple val(meta), path(vcf), path(tbi)
