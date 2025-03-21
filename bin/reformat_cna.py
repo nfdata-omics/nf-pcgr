@@ -5,62 +5,55 @@ import pandas as pd
 import argparse
 import sys
 
+def compute_major_minor(cn):
+    """
+    Compute nMajor and nMinor based on total copy number (cn).
+    """
+    if cn % 2 == 0:
+        return cn // 2, cn // 2
+    else:
+        return (cn + 1) // 2, cn // 2
+
 def reformat_cna(cna_file, sample):
     """
-    :param cna_file: somatic CNA file from Sarek.
-    :param sample:   string denoting sample name 'meta.id'
+    Reformat CNVkit .call.cns file for PCGR allele-specific input.
+    :param cna_file: CNVkit .call.cns file.
+    :param sample: Sample name for output (not used directly but kept for compatibility).
     """
-    # Add to this dictionary when familiar with ASCAT, Control-FREEC
-    index_keys = {"cnvkit": ["chromosome", "start", "end", "probes", "log2"]}
-
-    # Colnames expected by PCGR
-    final_columns = ["Sample", "Chromosome", "Start", "End", "Segment_Mean" , "Num_Probes"]
-
-    # Stage file and guess tool
-    df = pd.read_csv(cna_file, delim_whitespace=True)
-    tool = guess_tool(df)
-
-    # Log info
-    print(f"Reading {cna_file} file.\n\nProcessing {len(df.index) - 1} lines.\nCNA tool used:\n>{tool}\n")
-
-    # Skip if test-dataset
-    if tool != "pcgr":
-
-        # Subset columns corresponding to expected PCGR input.
-        index = index_keys[tool]
-        df = df[df.columns.intersection(index)]
-
-        # Insert 'Sample' columns and rename cols
-        df.insert(0, "Sample", sample)
-        df.set_axis(final_columns, 1, inplace=True)
-
-    # output TSV
-    out = sample + "." + tool + ".tsv"
-    df.to_csv(out, sep="\t", index=False)
+    # Read input (tab-delimited CNVkit .call.cns)
+    df = pd.read_csv(cna_file, sep='\t')
+    #tool = guess_tool(df)
 
 
-def guess_tool(df):
-    """
-    Mainly for indexing, posterity by adding tool name to filename.
-    'pcgr': only likely to occur using test data provided by PCGR
-            i.e when using a test-dataset.
-    """
+    # Validate required columns
+    required_cols = {"chromosome", "start", "end", "cn"}
+    if not required_cols.issubset(df.columns):
+        print(f"Error: Input file must contain columns: {', '.join(required_cols)}")
+        sys.exit(1)
 
-    tool_keys = {
-        "pcgr": ["Sample", "Chromosome", "Start", "End", "Num_Probes", "Segment_Mean"],
-        "cnvkit": ["chromosome", "start", "end", "gene", "log2", "depth", "probes", "weight", "ci_lo", "ci_hi"],
-    }
+    # Ensure CN is rounded and integer
+    df['cn'] = df['cn'].round().astype(int)
 
-    # subset list preferred (returns string) to list comprehension which returns a set.
-    tool = list(tool_keys.keys())[list(tool_keys.values()).index(list(df.axes[1]))]
-    return tool
+    # Compute nMajor and nMinor
+    df[['nMajor', 'nMinor']] = df['cn'].apply(lambda cn: pd.Series(compute_major_minor(cn)))
 
+    # Convert start to 1-based for PCGR
+    df['start'] = df['start'] + 1
+
+    # Prepare output with required PCGR columns
+    pcgr_df = df[['chromosome', 'start', 'end', 'nMajor', 'nMinor']]
+
+    # Output filename
+    out_file = sample + ".allele_specific.pcgr.tsv"
+    pcgr_df.to_csv(out_file, sep='\t', index=False)
+
+    print(f"PCGR allele-specific CNA file written to: {out_file}")
 
 def main():
-    # Argument parsing using argparse
-    parser = argparse.ArgumentParser(description="Reformat somatic CNA files for PCGR input.")
-    parser.add_argument("-i", "--input", required=True, help="Somatic CNA input file (space-delimited).")
-    parser.add_argument("-s", "--sample", required=True, help="Sample name (meta.id) for the output.")
+    # Argument parsing
+    parser = argparse.ArgumentParser(description="Convert CNVkit .call.cns to PCGR allele-specific format.")
+    parser.add_argument("-i", "--input", required=True, help="CNVkit .call.cns input file (tab-delimited).")
+    parser.add_argument("-s", "--sample", required=True, help="Sample name (used for output filename).")
 
     args = parser.parse_args()
 
@@ -69,9 +62,8 @@ def main():
         print(f"Error: Input file '{args.input}' does not exist.")
         sys.exit(1)
 
-    # Call reformat_cna function with arguments
+    # Process CNA file
     reformat_cna(args.input, args.sample)
-
 
 if __name__ == "__main__":
     main()
