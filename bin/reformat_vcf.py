@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 
 from pysam import VariantFile
-import subprocess
 import os
+import argparse
+import sys
 
+#####################################################################################################################
 # Inspired by: @gudeqing
 # https://github.com/sigven/pcgr/issues/136#issuecomment-919273152
 # Built upon by @BarryDigby to handle Strelka, Freebayes, Mutect2 VCF files.
-
-
+#####################################################################################################################
 def mutect2_vaf(record, sample_idx):
     VAF = record.samples[sample_idx]["AF"][0]
     VAF = VAF if VAF is not None else 0
@@ -26,7 +27,7 @@ def freebayes_vaf(record, sample_idx):
         VAF = AO / (AO + RO)
     return VAF
 
-
+# Strelka VCF format:    
 def strelka_snv_vaf(record, sample_idx):
     ref = str(record.ref + "U")
     alt = str(record.alts[0] + "U")
@@ -64,7 +65,6 @@ def strelka_variants_vaf(record, sample_idx):
         VAF = alt / (ref + alt)
     return VAF
 
-
 ## Strelka TAL = alternative allele, usually the reference
 ## Strelka TIL = Indel i.e the 'ALT'.
 ## using tier one [0] as per strelka recommendation.
@@ -75,7 +75,6 @@ def strelka_indel_allelic_depth(record, sample_idx):
     ALT = tmp_ALT.replace("(", "").replace(")", "")
     return f"{REF},{ALT}"
 
-
 def strelka_snv_allelic_depth(record, sample_idx):
     ref = str(record.ref + "U")
     alt = str(record.alts[0] + "U")
@@ -85,7 +84,6 @@ def strelka_snv_allelic_depth(record, sample_idx):
     ALT = tmp_ALT.replace("(", "").replace(")", "")
     return f"{REF},{ALT}"
 
-
 vcf_formats = {
     "mutect2_vaf": ["AD", "AF", "DP", "F1R2", "F2R1", "FAD", "GQ", "GT", "PGT", "PID", "PL", "PS", "SB"],
     "freebayes_vaf": ["AD", "AO", "DP", "GL", "GQ", "GT", "MIN_DP", "PL", "QA", "QR", "RO"],
@@ -93,12 +91,6 @@ vcf_formats = {
     "strelka_indel_vaf": ["BCN50", "DP", "DP2", "DP50", "FDP50", "SUBDP50", "TAR", "TIR", "TOR"],
     "strelka_variants_vaf" : ["AD", "ADF", "ADR", "DP", "DPF", "DPI", "FT", "GQ", "GQX", "GT", "MIN_DP", "PL", "PS", "SB"]
 }
-
-
-#####################################################################################################################
-#####################################################################################################################
-
-## just make a function for tumor-normal and tumor-only instead of using if-else to death.
 
 def tumor_normal(out):
     with VariantFile("tmp_.vcf") as fr:
@@ -109,7 +101,7 @@ def tumor_normal(out):
         header.info.add("TAF", number=1, type="Float", description="Tumor sample AF")
         header.info.add("NAF", number=1, type="Float", description="Normal sample AF")
         header.info.add("ADT", number=".", type="String", description="Allelic depths for the ref and alt alleles in the order listed (tumor)")
-        header.info.add("ADN",number=".",type="String",description="Allelic depths for the ref and alt alleles in the order listed (normal)")
+        header.info.add("ADN", number=".", type="String", description="Allelic depths for the ref and alt alleles in the order listed (normal)")
         header.info.add("TAL", number=".", type="String", description="Algorithms that called the somatic mutation")
         samples = list(header.samples)
         formats = list(header.formats)
@@ -143,7 +135,6 @@ def tumor_normal(out):
                     record.info["ADT"] = strelka_snv_allelic_depth(record, tumor_idx)
                     record.info["ADN"] = strelka_snv_allelic_depth(record, normal_idx)
                 else:
-                    # painful manipulation of the tuple returned e.g ( 74, 2 )
                     tmp = "".join([s.strip() for s in str(record.samples[tumor_idx]["AD"])])
                     record.info["ADT"] = tmp.replace("(", "").replace(")", "")
                     tmp = "".join([s.strip() for s in str(record.samples[normal_idx]["AD"])])
@@ -152,11 +143,8 @@ def tumor_normal(out):
                 record.samples[tumor_idx]["AL"] = algorithm_code
                 record.samples[normal_idx]["AL"] = algorithm_code
                 fw.write(record)
-        ## write file for bcftools reheader.
-        ## one per line, appearing in order of samples in VCF file
         normal = f"{samples[normal_idx]} NORMAL"
         tumor = f"{samples[tumor_idx]} TUMOR"
-        ## order matters:
         if normal_idx == 0:
             with open("bcftools_reheader.txt", "w") as f:
                 f.write(f"{normal}\n{tumor}")
@@ -197,10 +185,7 @@ def tumor_only(out):
                 record.info["TAL"] = algorithm
                 record.samples[tumor_idx]["AL"] = algorithm_code
                 fw.write(record)
-        ## write file for bcftools reheader.
-        ## one per line, appearing in order of samples in VCF file
         tumor = f"{samples[tumor_idx]} TUMOR"
-        ## order matters:
         with open("bcftools_reheader.txt", "w") as f:
             f.write(f"{tumor}")
 
@@ -212,11 +197,6 @@ def tumor_only(out):
     os.system(f"tabix {out}.gz")
 
 def reformat_vcf(vcf_file, out):
-    """
-    BCFtools: Must remove records where DP is missing "." for T or N sample.
-    Would like calculations need to be cross checked with someone with more experience in population genomics.
-    BCFtools: reformatting sample names to NORMAL, TUMOR for downstream merging.
-    """
     os.system(f"bcftools filter -e'FORMAT/DP=\".\"' {vcf_file} -o tmp_.vcf")
     with VariantFile("tmp_.vcf") as fr:
         header = fr.header
@@ -227,7 +207,20 @@ def reformat_vcf(vcf_file, out):
             tumor_only(out)
 
 
-if __name__ == "__main__":
-    from xcmds import xcmds
+def main():
+    parser = argparse.ArgumentParser(description="Reformat VCF files for tumor-normal or tumor-only VCF processing.")
+    parser.add_argument("-i", "--input", required=True, help="Input VCF file.")
+    parser.add_argument("-o", "--output", required=True, help="Output file name.")
+    
+    args = parser.parse_args()
+    
+    # Check if input file exists
+    if not os.path.exists(args.input):
+        print(f"Error: Input file '{args.input}' does not exist.")
+        sys.exit(1)
 
-    xcmds.xcmds(locals())
+    reformat_vcf(args.input, args.output)
+
+
+if __name__ == "__main__":
+    main()

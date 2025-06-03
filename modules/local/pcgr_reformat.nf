@@ -20,9 +20,8 @@ process REFORMAT_VCF {
     prefix = task.ext.prefix ?: "${meta.id}"
     """
     reformat_vcf.py \\
-        reformat_vcf \\
-        -vcf_file $vcf \\
-        -out ${prefix}.vcf
+        --input $vcf \\
+        --output ${prefix}.vcf
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -53,9 +52,8 @@ process REFORMAT_CNA {
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
     reformat_cna.py \\
-        reformat_cna \\
-        -cna_file $cna \\
-        -sample $prefix
+        --input $cna \\
+        --sample $prefix
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -85,9 +83,8 @@ process REFORMAT_PON {
     script:
     """
     reformat_pon.py \\
-        reformat_pon \\
-        -pon_file $pon \\
-        -out reformat.pon.vcf
+        --input $pon \\
+        --output reformat.pon.vcf
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

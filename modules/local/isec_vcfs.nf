@@ -1,6 +1,6 @@
 process ISEC_SOMATIC_VCFS {
     tag "${meta.patient}:${meta.sample}"
-    label 'process_medium'
+    label 'process_low'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'docker.io/barryd237/pysam-xcmds:latest' :
@@ -21,7 +21,7 @@ process ISEC_SOMATIC_VCFS {
     prefix = task.ext.prefix ?: "${meta.id}" // meta.sample, toggle using modules.config
     """
     isec_vcfs.py \
-        -sample ${prefix}
+        --sample ${prefix}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

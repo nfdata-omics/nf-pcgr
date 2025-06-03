@@ -1,6 +1,6 @@
 process PCGR_VCF {
     tag "${meta.patient}:${meta.sample}"
-    label 'process_high'
+    label 'process_low'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'docker.io/barryd237/pysam-xcmds:latest' :
@@ -22,8 +22,7 @@ process PCGR_VCF {
     prefix = task.ext.prefix ?: "${meta.id}"
     """
     pcgr_vcf.py \\
-        pcgr_ready_vcf \\
-        -sample ${prefix}
+        --sample ${prefix}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
