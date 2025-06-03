@@ -15,6 +15,8 @@ ch_fasta = Channel.fromPath(params.fasta, checkIfExists: true)
 pcgr_header = Channel.fromPath("${projectDir}/bin/pcgr_header.txt", checkIfExists:true)
 if (params.database) { ch_pcgr_dir = Channel.fromPath("${params.database}/data/${params.genome.toLowerCase()}") } else { exit 1, "Please provide a path to the PCGR annotation database." }
 if (params.tumor_only && params.pon_vcf) { pon_vcf = file(params.pon_vcf, checkIfExists: true) } else { pon_vcf = Channel.value([]) }
+vep_cache               = Channel.fromPath(params.vep_cache        )
+
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -67,7 +69,7 @@ workflow PCGR {
 
     MERGE_VCFS ( FORMAT_FILES.out.somatic_files, FORMAT_FILES.out.normalised_germline, ch_fasta.collect(), pcgr_header.collect(), ch_pcgr_dir.collect() )
 
-    RUN_PCGR( MERGE_VCFS.out.pcgr_ready_vcf, ch_pcgr_dir.collect(), FORMAT_FILES.out.pon_vcf )
+    RUN_PCGR( MERGE_VCFS.out.pcgr_ready_vcf, ch_pcgr_dir.collect(), FORMAT_FILES.out.pon_vcf, vep_cache.collect()  )
 
     RUN_CPSR( MERGE_VCFS.out.cpsr_ready_vcf, ch_pcgr_dir.collect() )
 
